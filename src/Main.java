@@ -7,24 +7,125 @@ import org.jgrapht.traverse.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Main {
 
 	public static void main(String[] args) {
+		
+		//Create blank workbook
+	      XSSFWorkbook workbook = new XSSFWorkbook();
+	      
+	      //Create a blank sheet
+	      XSSFSheet spreadsheet = workbook.createSheet("Resultado");
 
+	      //Create row object
+	      XSSFRow row;
+
+	    //This data needs to be written (Object[])
+	      Map < String, Object[] > resultados= new TreeMap < String, Object[] >();
+	      resultados.put( "1", new Object[] {
+	    	         "A estrella", "Beam Search", "Primero el mejor", "Escalada simple", "Escalada max pendiente" });
+	      
+	      Object[] resultadosArray = new Object[5];
+	      long startTime, endTime;
 		//Graph<Integer, DefaultWeightedEdge> integerGraph = crearGrafoEnteros();
-		Graph<Integer, DefaultWeightedEdge> grafo = crearGrafo();
-		/*
-        System.out.println("-- toString output");
-        System.out.println(integerGraph.toString());
-        for(DefaultWeightedEdge edge : integerGraph.edgeSet()) {
-        	double peso = integerGraph.getEdgeWeight(edge);
-        	System.out.println(edge.toString() + " - " + peso);
-        }
-        System.out.println();
-        */
-		//resolverEscaladaSimple(grafo);
-		AlgoritmnAStar.resolverEscaladaSimple(grafo, 5, 200);
+		//Graph<Integer, DefaultWeightedEdge> grafo = crearGrafo();
+		for(int i = 0 ; i < 1000 ; i++) {
+			List<Integer> vertexes = new ArrayList<Integer>();
+			Graph<Integer, DefaultWeightedEdge> grafo = GenerateRandomGraph(vertexes);
+			
+			int source =  ThreadLocalRandom.current().nextInt(0,  vertexes.size()-1) ;
+			int destiny=0;
+			
+			boolean repeat = true;
+			
+			while(repeat) {
+				destiny = ThreadLocalRandom.current().nextInt(0,  vertexes.size()-1);
+				repeat = source == destiny;
+			}
+			
+			startTime = System.nanoTime();
+			AlgoritmnAStar.AStar(grafo, vertexes.get(source), vertexes.get(destiny));
+			endTime = System.nanoTime();
+			resultadosArray[0] =  Long.valueOf(endTime-startTime);
+			
+			startTime = System.nanoTime();
+			AlgoritmnAStar.BeamSearch(grafo, vertexes.get(source), vertexes.get(destiny), 20);
+			endTime = System.nanoTime();
+			resultadosArray[1] =  Long.valueOf(endTime-startTime);
+			
+			startTime = System.nanoTime();
+			AlgoritmnAStar.primeroMejor(grafo, vertexes.get(source), vertexes.get(destiny));
+			endTime = System.nanoTime();
+			resultadosArray[2] =  Long.valueOf(endTime-startTime);
+			
+			startTime = System.nanoTime();
+			AlgoritmnAStar.resolverEscaladaSimple(grafo, vertexes.get(source), vertexes.get(destiny));
+			endTime = System.nanoTime();
+			resultadosArray[3] =  Long.valueOf(endTime-startTime);
+			
+			startTime = System.nanoTime();
+			AlgoritmnAStar.resolverEscaladaMaximaPendiente(grafo, vertexes.get(source), vertexes.get(destiny));
+			endTime = System.nanoTime();
+			resultadosArray[4] =  Long.valueOf(endTime-startTime);
+			
+			resultados.put(Integer.valueOf(i + 2).toString(), resultadosArray);
+			
+			//reinicializo array y libero memoria
+			resultadosArray = new Object[5];
+		}
+		
+		System.out.println("Imprimiendo excel...");
+	      //Iterate over data and write to sheet
+	      Set < String > keyid = resultados.keySet();
+	      int rowid = 0;
+	      
+	      /*muestro columnas que son valores String */
+	      Object[] arrayKeyid = keyid.toArray();
+	      
+	      row = spreadsheet.createRow(rowid++);
+	      Object [] arrColumnas = resultados.get(arrayKeyid[0]);
+	      int cellid = 0;
+	         
+	      for (Object obj : arrColumnas){
+	         Cell cellColumnas = row.createCell(cellid++);
+	         cellColumnas.setCellValue((String)obj);
+	      }
+	      
+	      /*Muestro numeros*/
+	      for (int i=1;i<arrayKeyid.length;i++) {
+	         row = spreadsheet.createRow(rowid++);
+	         Object [] objectArr = resultados.get(arrayKeyid[i]);
+	         cellid = 0;
+	         
+	         for (Object obj : objectArr){
+	            Cell cell = row.createCell(cellid++);
+	            cell.setCellValue((long)obj);
+	         }
+	      }
+	      //Write the workbook in file system
+	      FileOutputStream out;
+		try {
+			out = new FileOutputStream(
+			     new File("Resultados.xlsx"));
+			workbook.write(out);
+			out.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	      System.out.println("Resultados.xlsx creado con exito");
+		
 	}
 	
 	// *************************GRAFOS DE PRUEBA**************************************
@@ -61,7 +162,8 @@ public class Main {
     	Integer d = new Integer(8);
     	Integer e = new Integer(15);
     	Integer f = new Integer(20);
-    	Integer g = new Integer(11);
+    	Integer g = new Integer(38);
+    	//Integer g = new Integer(6);
     	Integer h = new Integer(25);
     	Integer i = new Integer(30);
     	Integer j = new Integer(27);
@@ -380,4 +482,77 @@ public class Main {
     	return nodo;
     }
     */
+    
+    public static Graph<Integer, DefaultWeightedEdge> GenerateRandomGraph(List<Integer> vertexes )
+	{
+		Graph<Integer, DefaultWeightedEdge> grafo = new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+		
+		//RANDOM DE MAXIMOS VERTICES , VA DE MAXIMO 100 A 200
+		int maxVertexes = ThreadLocalRandom.current().nextInt(100,  200);
+		
+		for(int i = 0 ; i <= maxVertexes ; i++)
+		{
+			int random = ThreadLocalRandom.current().nextInt(0,  1000);
+			if( !vertexes.contains(random))
+			{
+				Integer value = new Integer(random);
+				vertexes.add(value);
+				grafo.addVertex(value);
+			}
+		}
+		//EN ESTA PARTE AGREGO UN CAMINO QUE LLEVE A TODO , YO QUERIA SER UN MAESTRO POKEMON , NO PUDE SERLO , POR ESO HICE ESTA BOSTA :D
+		List<Integer> open = new ArrayList<Integer>(vertexes);
+		
+		int current = 0;
+		int next = 0;
+		while( open.size() != 2 )
+		{
+			boolean repeat = true;
+			
+			while(repeat) {
+				next = ThreadLocalRandom.current().nextInt(0,  open.size()-1);
+				repeat = current == next;
+			}
+			
+			DefaultWeightedEdge edge = new DefaultWeightedEdge();
+
+	        grafo.addEdge( open.get(current) , open.get(next) , edge);
+	        
+	        int cost = ThreadLocalRandom.current().nextInt(0, 1000);
+	        
+	        grafo.setEdgeWeight(edge, cost);
+	        
+	        open.remove(current);
+	        if(current < next) {
+	        	current = next == 0 ? 0 : next-1;
+	        }
+	        else
+	        {
+	        	current = next;
+	        }
+			
+		}
+		//ACA ESTA LAS ARISTAS EXTRA A AGREGAR , ES UN RANDOM DEL 200 AL 300
+		int addingEdges = ThreadLocalRandom.current().nextInt(200,  300);
+		
+		for(int i = 0 ; i <= addingEdges ; i++ )
+		{
+			int source = ThreadLocalRandom.current().nextInt(0,  vertexes.size()-1);
+			int destiny = 0;
+			boolean repeat = true;
+			
+			while(repeat) 
+			{
+				destiny = ThreadLocalRandom.current().nextInt(0,  vertexes.size()-1);
+				repeat = source == destiny;
+			}
+			
+			DefaultWeightedEdge edge = new DefaultWeightedEdge();
+			
+			grafo.addEdge( vertexes.get(source) , vertexes.get(destiny) , edge);
+		}
+		
+		return grafo;
+	}
+	
 }
